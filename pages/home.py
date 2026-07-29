@@ -51,7 +51,7 @@ with left:
 2. Create an event below
 3. Build the schedule on **Schedule Builder**
 4. Enter scores live on **Score Entry**
-5. Follow the night on **Match Central**, then dive into **Picklelytics**
+5. Follow the night on **Match Central**, then dive into **DinkDex Analytics**
         """
     )
 

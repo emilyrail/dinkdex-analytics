@@ -1,4 +1,4 @@
-"""Pickle — local-first pickleball analytics."""
+"""DinkDex Analytics — local-first pickleball analytics."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from database.migrate import init_db
 from utils.session import bootstrap_session
 
 st.set_page_config(
-    page_title="Pickle",
+    page_title="DinkDex Analytics",
     page_icon="🥒",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -36,7 +36,7 @@ pages = {
         st.Page("pages/8_Data_Import.py", title="Data Import", icon="📥"),
         st.Page("pages/9_Settings.py", title="Settings", icon="⚙️"),
     ],
-    "🥒📈 Picklelytics": [
+    "🥒📈 DinkDex Analytics": [
         st.Page("pages/10_Live_Event_Dashboard.py", title="Match Central", icon="🏆"),
         st.Page("pages/5_Player_Profiles.py", title="Player Profiles", icon="✨"),
         st.Page("pages/6_Analytics.py", title="Overall Analytics", icon="📊"),

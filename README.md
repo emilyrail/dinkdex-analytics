@@ -1,4 +1,4 @@
-# Pickle
+# DinkDex Analytics
 
 Local-first pickleball analytics for competitive game nights.
 
@@ -41,5 +41,3 @@ DuckDB file lives at `data/pickleball.duckdb` (gitignored). Back it up by copyin
 - Deeper analytics (partners, H2H, SOS, trends)
 - CSV historical import
 - Ollama match/weekly recaps
-# picklelytics
-# picklelytics
