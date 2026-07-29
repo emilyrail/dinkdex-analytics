@@ -1,4 +1,7 @@
-data/
+data/*
+!data/.gitkeep
+!data/pickleball.duckdb
+*.duckdb.wal
 __pycache__/
 *.py[cod]
 *$py.class
