@@ -42,3 +42,4 @@ DuckDB file lives at `data/pickleball.duckdb` (gitignored). Back it up by copyin
 - CSV historical import
 - Ollama match/weekly recaps
 # picklelytics
+# picklelytics
