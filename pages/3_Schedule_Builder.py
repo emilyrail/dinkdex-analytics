@@ -219,6 +219,13 @@ st.divider()
 # --- Current schedule ---
 st.subheader("Schedule")
 schedule_df = schedule_service.schedule_df(event_id)
+# Court fields may use facility numbers (e.g. 9–15), not 1..num_courts.
+_existing_court_max = 1
+if not schedule_df.empty and "court" in schedule_df.columns:
+    _court_series = pd.to_numeric(schedule_df["court"], errors="coerce").dropna()
+    if not _court_series.empty:
+        _existing_court_max = int(_court_series.max())
+court_input_max = max(int(event.num_courts), _existing_court_max, 20)
 duplicate_ids_by_round, duplicate_names_by_round = _round_duplicate_players(
     schedule_df,
     name_to_id_lookup=player_name_to_id,
@@ -483,7 +490,7 @@ with st.expander("Add a match", expanded=False):
         b2 = c4.selectbox("Team B — player 2", attendee_ids, format_func=lambda i: attendee_labels[i], key="b2")
         r1, r2, r3 = st.columns(3)
         round_number = r1.number_input("Round", min_value=1, value=1)
-        court = r2.number_input("Court", min_value=1, max_value=int(event.num_courts), value=1)
+        court = r2.number_input("Court", min_value=1, max_value=court_input_max, value=1)
         submitted = r3.form_submit_button("Add match", type="primary")
         if submitted:
             try:
@@ -653,7 +660,7 @@ with st.expander("Edit upcoming match", expanded=False):
             ecourt = r2.number_input(
                 "Court",
                 min_value=1,
-                max_value=int(event.num_courts),
+                max_value=max(court_input_max, int(match.court or 1)),
                 value=match.court or 1,
             )
             eorder = r3.number_input("Order", min_value=1, value=match.match_order)
