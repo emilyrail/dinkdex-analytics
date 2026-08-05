@@ -181,8 +181,87 @@ attendee_ids = event_service.get_attendee_ids(event_id)
 attendee_labels = {
     p.id: options.get(p.id, p.label) for p in all_players if p.id in set(attendee_ids)
 }
+
+
+def _import_schedule_from_upload() -> None:
+    st.caption(
+        "CSV columns: `round`, `court`, `player_a1`, `player_a2`, `player_b1`, `player_b2`. "
+        "Scores are optional and ignored. Missing players are created and added as attendees."
+    )
+    template_csv = (
+        "round,court,player_a1,player_a2,player_b1,player_b2\n"
+        "1,1,Alex,Jordan,Sam,Taylor\n"
+        "1,2,Chris,Morgan,Riley,Casey\n"
+    )
+    st.download_button(
+        "Download blank template",
+        data=template_csv.encode("utf-8"),
+        file_name="pickle-schedule-template.csv",
+        mime="text/csv",
+        key="schedule_template_dl",
+    )
+    uploaded = st.file_uploader(
+        "Schedule CSV", type=["csv"], key="schedule_upload_csv"
+    )
+    replace_unscored = st.checkbox(
+        "Replace unscored scheduled matches",
+        value=True,
+        help="Keeps completed/scored matches. Clears other scheduled matches before import.",
+    )
+    if uploaded is None:
+        return
+    try:
+        from import_.parsers import normalize_schedule_upload_df
+
+        raw_df = pd.read_csv(uploaded)
+        parsed_df = normalize_schedule_upload_df(raw_df)
+        st.dataframe(
+            parsed_df[
+                [
+                    "round_number",
+                    "court",
+                    "player_a1",
+                    "player_a2",
+                    "player_b1",
+                    "player_b2",
+                ]
+            ].rename(columns={"round_number": "round"}),
+            use_container_width=True,
+            hide_index=True,
+        )
+        if st.button("Import schedule", type="primary", key="import_schedule_btn"):
+            result = schedule_service.import_schedule(
+                event_id,
+                parsed_df.to_dict(orient="records"),
+                replace_unscored=replace_unscored,
+                name_to_id=player_name_to_id,
+            )
+            bump_data_version()
+            msg = f"Imported {result['created']} match(es)"
+            if result["cleared_unscored"]:
+                msg += f" (cleared {result['cleared_unscored']} unscored)"
+            created_names = result.get("created_players") or []
+            if created_names:
+                msg += f"; added player(s): {', '.join(created_names)}"
+            added = result.get("added_attendees") or []
+            added_only = [n for n in added if n not in set(created_names)]
+            if added_only:
+                msg += f"; added to attendees: {', '.join(sorted(set(added_only)))}"
+            st.success(msg + ".")
+            st.rerun()
+    except ValueError as exc:
+        st.error(str(exc))
+    except Exception as exc:  # noqa: BLE001
+        st.error(f"Could not read schedule CSV: {exc}")
+
+
 if len(attendee_ids) < 4:
-    st.warning("Need at least 4 attendees to create matches.")
+    st.warning(
+        "Need at least 4 attendees to generate or edit matches. "
+        "Upload a schedule CSV to create missing players, add them as attendees, and import matches."
+    )
+    with st.expander("Upload schedule", expanded=True):
+        _import_schedule_from_upload()
     st.stop()
 
 st.markdown("**Schedule Generator**")
@@ -854,70 +933,4 @@ with st.expander("Export / Upload schedule", expanded=False):
 
     with up_col:
         st.markdown("**Upload schedule**")
-        st.caption(
-            "CSV columns: `round`, `court`, `player_a1`, `player_a2`, `player_b1`, `player_b2`. "
-            "Scores are optional and ignored. Players must already be attendees."
-        )
-        template_csv = (
-            "round,court,player_a1,player_a2,player_b1,player_b2\n"
-            "1,1,Alex,Jordan,Sam,Taylor\n"
-            "1,2,Chris,Morgan,Riley,Casey\n"
-        )
-        st.download_button(
-            "Download blank template",
-            data=template_csv.encode("utf-8"),
-            file_name="pickle-schedule-template.csv",
-            mime="text/csv",
-            key="schedule_template_dl",
-        )
-        uploaded = st.file_uploader(
-            "Schedule CSV", type=["csv"], key="schedule_upload_csv"
-        )
-        replace_unscored = st.checkbox(
-            "Replace unscored scheduled matches",
-            value=True,
-            help="Keeps completed/scored matches. Clears other scheduled matches before import.",
-        )
-        if uploaded is not None:
-            try:
-                from import_.parsers import normalize_schedule_upload_df
-
-                raw_df = pd.read_csv(uploaded)
-                parsed_df = normalize_schedule_upload_df(raw_df)
-                st.dataframe(
-                    parsed_df[
-                        [
-                            "round_number",
-                            "court",
-                            "player_a1",
-                            "player_a2",
-                            "player_b1",
-                            "player_b2",
-                        ]
-                    ].rename(columns={"round_number": "round"}),
-                    use_container_width=True,
-                    hide_index=True,
-                )
-                if st.button(
-                    "Import schedule", type="primary", key="import_schedule_btn"
-                ):
-                    result = schedule_service.import_schedule(
-                        event_id,
-                        parsed_df.to_dict(orient="records"),
-                        replace_unscored=replace_unscored,
-                        name_to_id=player_name_to_id,
-                    )
-                    bump_data_version()
-                    st.success(
-                        f"Imported {result['created']} match(es)"
-                        + (
-                            f" (cleared {result['cleared_unscored']} unscored)."
-                            if result["cleared_unscored"]
-                            else "."
-                        )
-                    )
-                    st.rerun()
-            except ValueError as exc:
-                st.error(str(exc))
-            except Exception as exc:  # noqa: BLE001
-                st.error(f"Could not read schedule CSV: {exc}")
+        _import_schedule_from_upload()

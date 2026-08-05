@@ -148,6 +148,7 @@ class ScheduleService:
         *,
         replace_unscored: bool = True,
         name_to_id: dict[str, int] | None = None,
+        create_missing_players: bool = True,
     ) -> dict:
         """
         Import scheduled matches from parsed rows.
@@ -155,6 +156,8 @@ class ScheduleService:
         Each row needs: player_a1, player_a2, player_b1, player_b2, round_number,
         and optionally court, match_order, is_finale, finale_label.
         Player fields are names resolved via name_to_id (casefold keys).
+        Missing players are created and added as attendees when
+        create_missing_players is True.
         """
         event = self.events.get(event_id)
         if event is None:
@@ -163,33 +166,60 @@ class ScheduleService:
             raise ValueError("No matches to import")
 
         lookup = {k.strip().casefold(): v for k, v in (name_to_id or {}).items()}
-        if not lookup:
-            for p in self.players.list_players(active_only=False):
-                if p.name:
-                    lookup[p.name.strip().casefold()] = p.id
-                if p.display_name:
-                    lookup[p.display_name.strip().casefold()] = p.id
-                if p.label:
-                    lookup[p.label.strip().casefold()] = p.id
+        for p in self.players.list_players(active_only=False):
+            if p.name:
+                lookup.setdefault(p.name.strip().casefold(), p.id)
+            if p.display_name:
+                lookup.setdefault(p.display_name.strip().casefold(), p.id)
+            if p.label:
+                lookup.setdefault(p.label.strip().casefold(), p.id)
 
         attendee_ids = set(self.events.get_player_ids(event_id))
+        created_players: list[str] = []
+        added_attendees: list[str] = []
 
-        def resolve(name: object) -> int:
-            key = str(name).strip().casefold()
+        def ensure_player(name: object) -> int:
+            raw = str(name).strip()
+            key = raw.casefold()
             if not key or key == "nan":
                 raise ValueError("Blank player name in schedule upload")
             pid = lookup.get(key)
-            if pid is None:
-                raise ValueError(f"Unknown player: {name}")
-            return int(pid)
+            if pid is not None:
+                return int(pid)
+            existing = self.players.find_by_name(raw)
+            if existing is not None:
+                lookup[key] = existing.id
+                return existing.id
+            if not create_missing_players:
+                raise ValueError(f"Unknown player: {raw}")
+            created = self.players.create(raw)
+            lookup[key] = created.id
+            created_players.append(created.name)
+            return created.id
+
+        def ensure_attendee(pid: int, label: object) -> None:
+            if pid in attendee_ids:
+                return
+            self.conn.execute(
+                """
+                INSERT INTO event_players (event_id, player_id)
+                SELECT ?, ?
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM event_players WHERE event_id = ? AND player_id = ?
+                )
+                """,
+                [event_id, pid, event_id, pid],
+            )
+            attendee_ids.add(pid)
+            added_attendees.append(str(label).strip())
 
         resolved: list[dict] = []
         for i, row in enumerate(rows, start=1):
             try:
-                a1 = resolve(row["player_a1"])
-                a2 = resolve(row["player_a2"])
-                b1 = resolve(row["player_b1"])
-                b2 = resolve(row["player_b2"])
+                a1 = ensure_player(row["player_a1"])
+                a2 = ensure_player(row["player_a2"])
+                b1 = ensure_player(row["player_b1"])
+                b2 = ensure_player(row["player_b2"])
             except ValueError as exc:
                 raise ValueError(f"Row {i}: {exc}") from exc
             for pid, label in [
@@ -198,11 +228,7 @@ class ScheduleService:
                 (b1, row["player_b1"]),
                 (b2, row["player_b2"]),
             ]:
-                if pid not in attendee_ids:
-                    raise ValueError(
-                        f"Row {i}: {label} is not on tonight's attendee list. "
-                        "Add them under Attendees & courts first."
-                    )
+                ensure_attendee(pid, label)
             round_number = int(row.get("round_number") or 1)
             court = row.get("court")
             court_i = None if _is_missing(court) else int(court)
@@ -258,9 +284,19 @@ class ScheduleService:
             event_id,
             "import_schedule",
             None,
-            {"created": len(created), "cleared_unscored": cleared},
+            {
+                "created": len(created),
+                "cleared_unscored": cleared,
+                "created_players": created_players,
+                "added_attendees": added_attendees,
+            },
         )
-        return {"created": len(created), "cleared_unscored": cleared}
+        return {
+            "created": len(created),
+            "cleared_unscored": cleared,
+            "created_players": created_players,
+            "added_attendees": added_attendees,
+        }
 
     def generate_schedule(
         self,
