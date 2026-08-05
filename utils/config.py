@@ -14,6 +14,8 @@ PROVISIONAL_K_MULTIPLIER = 2.0
 DEFAULT_GAME_TO = 11
 DEFAULT_WIN_BY = 2
 DEFAULT_NUM_COURTS = 2
+# Upper bound only for "how many matches run at once" event setting.
+MAX_SIMULTANEOUS_COURTS = 22
 
 OLLAMA_URL = "http://localhost:11434"
 OLLAMA_MODEL = "llama3.2"

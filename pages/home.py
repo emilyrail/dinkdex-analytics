@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
 from database.migrate import init_db
 from services.event_service import EventService
 from services.player_service import PlayerService
+from utils.config import MAX_SIMULTANEOUS_COURTS
 from utils.session import bootstrap_session, set_active_event
 
 bootstrap_session()
@@ -60,7 +61,13 @@ with right:
     with st.form("create_event_home"):
         name = st.text_input("Event name", value="Game Night")
         event_date = st.date_input("Date")
-        num_courts = st.number_input("Courts", min_value=1, max_value=8, value=2)
+        num_courts = st.number_input(
+            "Courts in use",
+            min_value=1,
+            max_value=MAX_SIMULTANEOUS_COURTS,
+            value=2,
+            help="How many matches run at once for auto-generate. Individual match court numbers are free-form.",
+        )
         player_options = {p.id: p.label for p in players}
         selected_players = st.multiselect(
             "Attending players",
