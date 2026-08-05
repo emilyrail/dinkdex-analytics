@@ -29,9 +29,11 @@ pages = {
         st.Page("pages/home.py", title="Home", icon="🏠", default=True),
     ],
     "Set Up": [
-        st.Page("pages/4_Players.py", title="Players", icon="👥"),
         st.Page("pages/3_Schedule_Builder.py", title="Schedule Builder", icon="🗓️"),
         st.Page("pages/2_Score_Entry.py", title="Score Entry", icon="✍️"),
+    ],
+    "🧹 Housekeeping": [
+        st.Page("pages/4_Players.py", title="Players", icon="👥"),
         st.Page("pages/7_Event_History.py", title="Event History", icon="📜"),
         st.Page("pages/8_Data_Import.py", title="Data Import", icon="📥"),
         st.Page("pages/9_Settings.py", title="Settings", icon="⚙️"),
