@@ -16,9 +16,15 @@ class RecomputeService:
         self.conn = conn or get_connection()
 
     def rebuild_all(self, *, k: float = ELO_K) -> None:
-        """Full chronological Elo replay + refresh all event_standings."""
+        """Full chronological Elo replay + refresh all event_standings.
+
+        Runs inside a transaction so a mid-rebuild failure cannot leave every
+        player stuck at INITIAL_ELO with an empty elo_history.
+        """
         try:
+            self.conn.execute("BEGIN TRANSACTION")
             self._rebuild_all_inner(k=k)
+            self.conn.commit()
         except Exception:
             try:
                 self.conn.execute("ROLLBACK")
