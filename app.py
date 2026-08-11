@@ -72,3 +72,4 @@ with st.sidebar:
         st.page_link(settings, label="Settings", icon="⚙️")
 
 pg.run()
+
