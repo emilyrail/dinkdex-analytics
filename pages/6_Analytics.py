@@ -140,7 +140,7 @@ progress = progress[progress["player_id"].astype(int).isin(eligible_ids)].copy()
 
 # Re-rank within the currently selected player set.
 snapshot = snapshot.sort_values(
-    ["wins", "win_pct", "point_diff", "current_elo"],
+    ["current_elo", "win_pct", "wins", "point_diff"],
     ascending=[False, False, False, False],
 ).reset_index(drop=True)
 snapshot["rank"] = snapshot.index + 1
@@ -170,9 +170,9 @@ with tabs[0]:
         [
             "rank",
             "player",
-            "Record",
-            "Win %",
             "Elo",
+            "Win %",
+            "Record",
             "Elo Δ (last 10)",
             "Pt Diff",
             "SOS",

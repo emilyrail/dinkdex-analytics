@@ -879,7 +879,7 @@ class AnalyticsService:
 
         grouped = grouped[grouped["games"] >= max(1, int(min_games))].copy()
         grouped = grouped.sort_values(
-            ["wins", "win_pct", "point_diff", "current_elo"],
+            ["current_elo", "win_pct", "wins", "point_diff"],
             ascending=[False, False, False, False],
         ).reset_index(drop=True)
         grouped["rank"] = grouped.index + 1

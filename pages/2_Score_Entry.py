@@ -64,12 +64,7 @@ def _ensure_score_key(key: str, raw: object) -> None:
 
 
 def _score_input(label: str, key: str) -> None:
-    minus, field, plus = st.columns([1, 2.2, 1], gap="small")
-    if minus.button("−", key=f"{key}_dec", use_container_width=True):
-        cur = st.session_state.get(key)
-        st.session_state[key] = max(0, 0 if cur is None else int(cur) - 1)
-        st.rerun()
-    field.number_input(
+    st.number_input(
         label,
         min_value=0,
         max_value=50,
@@ -78,10 +73,6 @@ def _score_input(label: str, key: str) -> None:
         placeholder="–",
         label_visibility="collapsed",
     )
-    if plus.button("+", key=f"{key}_inc", use_container_width=True):
-        cur = st.session_state.get(key)
-        st.session_state[key] = min(50, 1 if cur is None else int(cur) + 1)
-        st.rerun()
 
 
 def _save_round_scores(
