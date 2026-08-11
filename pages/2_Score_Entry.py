@@ -19,7 +19,7 @@ from services.event_service import EventService
 from services.recompute_service import RecomputeService
 from services.schedule_service import ScheduleService
 from services.score_service import ScoreService, ScoreValidationError
-from utils.session import bootstrap_session, bump_data_version
+from utils.session import bootstrap_session, bump_data_version, set_active_event
 
 bootstrap_session()
 init_db(st.session_state.db_path)
@@ -150,12 +150,36 @@ def _save_round_scores(
 
 
 st.title("Score Entry")
-event_id = st.session_state.active_event_id
-if not event_id:
-    st.warning("Select an active event from the Home page sidebar.")
+
+event_service = EventService()
+events = event_service.list_events()
+if not events:
+    st.warning("No events yet. Create one on Home first.")
     st.stop()
 
-event = EventService().get_event(event_id)
+event_ids = [event.id for event in events]
+event_labels = {
+    event.id: f"{event.event_date} — {event.name} ({event.status.value})"
+    for event in events
+}
+current_event_id = st.session_state.active_event_id
+if current_event_id not in event_ids:
+    current_event_id = event_ids[0]
+    set_active_event(current_event_id)
+
+selected_event_id = st.selectbox(
+    "Active event",
+    options=event_ids,
+    index=event_ids.index(current_event_id),
+    format_func=lambda selected_id: event_labels[selected_id],
+    key="score_entry_event_select",
+)
+if selected_event_id != st.session_state.active_event_id:
+    set_active_event(int(selected_event_id))
+    st.rerun()
+
+event_id = int(selected_event_id)
+event = event_service.get_event(event_id)
 assert event is not None
 st.caption(f"{event.name} · to {event.game_to}, win by {event.win_by}")
 
