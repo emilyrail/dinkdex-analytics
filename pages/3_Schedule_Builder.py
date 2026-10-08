@@ -264,13 +264,67 @@ if len(attendee_ids) < 4:
         _import_schedule_from_upload()
     st.stop()
 
+player_label_by_id = {p.id: p.label for p in all_players}
+fixed_teams = schedule_service.get_fixed_teams(event_id)
+
 st.markdown("**Schedule Generator**")
 with st.expander("Generate schedule", expanded=False):
+    st.markdown("**Fixed partners**")
+    st.caption(
+        "These pairs always play on the same team, and sit out together, when you generate."
+    )
+    for p1, p2 in fixed_teams:
+        label = (
+            f"{player_label_by_id.get(p1, f'Player {p1}')} + "
+            f"{player_label_by_id.get(p2, f'Player {p2}')}"
+        )
+        if p1 not in attendee_labels or p2 not in attendee_labels:
+            label += " — not both attending, so ignored"
+        fc1, fc2 = st.columns([4, 1], vertical_alignment="center")
+        fc1.write(label)
+        if fc2.button("Remove", key=f"fixed_team_remove_{p1}_{p2}", use_container_width=True):
+            schedule_service.set_fixed_teams(
+                event_id, [team for team in fixed_teams if team != (p1, p2)]
+            )
+            bump_data_version()
+            st.rerun()
+
+    taken = {pid for team in fixed_teams for pid in team}
+    available = [pid for pid in attendee_ids if pid not in taken]
+    if len(available) >= 2:
+        fa, fb, fc = st.columns([2, 2, 1], vertical_alignment="bottom")
+        first = fa.selectbox(
+            "Player",
+            options=available,
+            index=None,
+            placeholder="Choose player",
+            format_func=lambda i: attendee_labels.get(i, f"Player {i}"),
+            key="fixed_team_first",
+        )
+        second = fb.selectbox(
+            "Partner",
+            options=[pid for pid in available if pid != first],
+            index=None,
+            placeholder="Choose partner",
+            format_func=lambda i: attendee_labels.get(i, f"Player {i}"),
+            key="fixed_team_second",
+        )
+        if fc.button(
+            "Add pair",
+            disabled=first is None or second is None,
+            use_container_width=True,
+            key="fixed_team_add",
+        ):
+            schedule_service.set_fixed_teams(event_id, [*fixed_teams, (first, second)])
+            bump_data_version()
+            st.rerun()
+
+    st.divider()
     with st.form("generate_schedule"):
         g1, g2, g3 = st.columns(3)
         num_rounds = g1.number_input("Rounds", min_value=1, max_value=30, value=6)
         seed = g2.number_input("Seed", min_value=0, value=42)
-        balance_elo = g3.checkbox("Balance by Elo", value=True)
+        balance_elo = g3.checkbox("Balance by Elo", value=False)
         replace = st.checkbox("Replace existing upcoming matches", value=True)
         generate = st.form_submit_button("Generate", type="primary")
         if generate:
@@ -311,7 +365,9 @@ duplicate_ids_by_round, duplicate_names_by_round = _round_duplicate_players(
 )
 
 
-def _schedule_variety_stats(df: pd.DataFrame) -> dict[str, object]:
+def _schedule_variety_stats(
+    df: pd.DataFrame, fixed_pairs: set[tuple[int, int]]
+) -> dict[str, object]:
     if df.empty:
         return {
             "partner_repeat_total": 0,
@@ -331,8 +387,9 @@ def _schedule_variety_stats(df: pd.DataFrame) -> dict[str, object]:
         b1 = int(row["b1_id"])
         b2 = int(row["b2_id"])
 
-        partner_counts[tuple(sorted((a1, a2)))] += 1
-        partner_counts[tuple(sorted((b1, b2)))] += 1
+        for team in (tuple(sorted((a1, a2))), tuple(sorted((b1, b2)))):
+            if team not in fixed_pairs:
+                partner_counts[team] += 1
 
         for a in (a1, a2):
             for b in (b1, b2):
@@ -368,7 +425,7 @@ if page_error and conflict_round is None and not conflict_names:
 if schedule_df.empty:
     st.info("No matches yet. Add one below.")
 else:
-    variety = _schedule_variety_stats(schedule_df)
+    variety = _schedule_variety_stats(schedule_df, set(fixed_teams))
     scheduled_team_elos = []
     for _, scheduled_row in schedule_df.iterrows():
         if all(
@@ -395,7 +452,11 @@ else:
         else 1000.0
     )
     v1, v2, v3 = st.columns(3)
-    v1.metric("Repeated partners", int(variety["partner_repeat_total"]))
+    v1.metric(
+        "Repeated partners",
+        int(variety["partner_repeat_total"]),
+        help="Fixed partners are not counted." if fixed_teams else None,
+    )
     v2.metric("Repeated opponents", int(variety["opponent_repeat_total"]))
     v3.metric("Avg Team Elo", f"{avg_team_elo:.0f}")
 

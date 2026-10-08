@@ -23,6 +23,7 @@ def score_schedule(
     weights: CostWeights,
     elo_by_player: dict[int, float] | None = None,
     partner_history_counts: dict[tuple[int, int], int] | None = None,
+    fixed_teams: set[tuple[int, int]] | None = None,
 ) -> tuple[float, ScheduleQuality]:
     partner_counts: dict[tuple[int, int], int] = defaultdict(int)
     opponent_counts: dict[tuple[int, int], int] = defaultdict(int)
@@ -62,12 +63,16 @@ def score_schedule(
             hist.get(pk, 0) + hist.get(pk2, 0)
         )
 
-    partner_repeat_total = sum(max(0, c - 1) for c in partner_counts.values())
+    fixed = fixed_teams or set()
+    partner_repeat_total = sum(
+        max(0, c - 1) for k, c in partner_counts.items() if k not in fixed
+    )
     opponent_repeat_total = sum(max(0, c - 1) for c in opponent_counts.values())
     foursome_repeat = sum(max(0, c - 1) for c in foursome_counts.values())
 
     cost += weights.partner_repeat * partner_repeat_total
-    cost += weights.opponent_repeat * opponent_repeat_total
+    # Squared so facing one opponent 3x costs more than two opponents 2x each.
+    cost += weights.opponent_repeat * sum(max(0, c - 1) ** 2 for c in opponent_counts.values())
     cost += weights.foursome_repeat * foursome_repeat
 
     if games:

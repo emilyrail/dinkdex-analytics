@@ -43,6 +43,12 @@ This file is the transfer document for future agents working on this project.
 - Elo starts at 1000 with normal K=24. A player is **Provisional** for fewer than 10
   completed games and uses 2x K (48) for each of those games. Per-player K is supported,
   so provisional and established teammates may receive different deltas.
+- Schedule generator defaults to **not** balancing by Elo.
+- Fixed partners are stored per event in `app_meta` key `fixed_teams_<event_id>` (JSON list of
+  player-id pairs) and edited in Schedule Builder > Generate schedule. The generator keeps each
+  pair on one team and sits them out together; pairs with a non-attending player are ignored.
+- Generator search is simulated annealing; opponent repeats are penalized quadratically so
+  facing one opponent 3x costs more than two opponents 2x each.
 - Finale matches always use dedicated round `99`.
 - Finale seeding uses the same Live Rankings power score as Match Central:
   `win_pct*60 + avg_point_diff*4 + elo_delta_tonight*1.2 + wins*2`.

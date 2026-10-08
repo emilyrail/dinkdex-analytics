@@ -298,6 +298,35 @@ class ScheduleService:
             "added_attendees": added_attendees,
         }
 
+    def get_fixed_teams(self, event_id: int) -> list[tuple[int, int]]:
+        row = self.conn.execute(
+            "SELECT value FROM app_meta WHERE key = ?",
+            [f"fixed_teams_{event_id}"],
+        ).fetchone()
+        if not row or not row[0]:
+            return []
+        return [(int(a), int(b)) for a, b in json.loads(row[0])]
+
+    def set_fixed_teams(self, event_id: int, teams: list[tuple[int, int]]) -> None:
+        seen: set[int] = set()
+        cleaned: list[tuple[int, int]] = []
+        for a, b in teams:
+            a, b = int(a), int(b)
+            if a == b:
+                raise ValueError("A fixed team needs two different players")
+            if a in seen or b in seen:
+                raise ValueError("A player can only be in one fixed team")
+            seen.update((a, b))
+            cleaned.append((min(a, b), max(a, b)))
+        self.conn.execute(
+            """
+            INSERT INTO app_meta (key, value)
+            VALUES (?, ?)
+            ON CONFLICT (key) DO UPDATE SET value = excluded.value
+            """,
+            [f"fixed_teams_{event_id}", json.dumps(cleaned)],
+        )
+
     def generate_schedule(
         self,
         event_id: int,
@@ -305,14 +334,21 @@ class ScheduleService:
         num_rounds: int,
         seed: int = 42,
         replace_existing: bool = True,
-        balance_elo: bool = True,
+        balance_elo: bool = False,
+        fixed_teams: list[tuple[int, int]] | None = None,
     ) -> ScheduleResult:
+        """Generate rounds. ``fixed_teams`` defaults to the event's saved fixed partners;
+        pairs with a non-attending player are skipped."""
         event = self.events.get(event_id)
         if event is None:
             raise ValueError("Event not found")
         player_ids = self.events.get_player_ids(event_id)
         if len(player_ids) < 4:
             raise ValueError("Need at least 4 attendees")
+        if fixed_teams is None:
+            fixed_teams = self.get_fixed_teams(event_id)
+        attending = set(player_ids)
+        fixed_teams = [(a, b) for a, b in fixed_teams if a in attending and b in attending]
 
         elo_by_player = None
         if balance_elo:
@@ -342,6 +378,7 @@ class ScheduleService:
             num_rounds=num_rounds,
             elo_by_player=elo_by_player,
             completed_matches=completed,
+            fixed_teams=fixed_teams,
             seed=seed,
         )
         result = self.generator.generate(request)

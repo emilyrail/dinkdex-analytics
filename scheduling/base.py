@@ -36,6 +36,7 @@ class ScheduleRequest:
     partner_history_counts: dict[tuple[int, int], int] | None = None
     locked_matches: list[ProposedMatch] = field(default_factory=list)
     completed_matches: list[ProposedMatch] = field(default_factory=list)
+    fixed_teams: list[tuple[int, int]] = field(default_factory=list)
     weights: CostWeights = field(default_factory=CostWeights)
     seed: int | None = 42
 

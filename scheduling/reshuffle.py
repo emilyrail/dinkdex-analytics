@@ -19,6 +19,7 @@ def reshuffle_remaining(
         elo_by_player=request.elo_by_player,
         partner_history_counts=request.partner_history_counts,
         completed_matches=request.completed_matches,
+        fixed_teams=request.fixed_teams,
         weights=request.weights,
         seed=request.seed,
     )
